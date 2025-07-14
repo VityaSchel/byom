@@ -17,6 +17,10 @@ type ProtobufSchema<TInterface = any, TMessage = any> = {
 type InferMessageType<T> = T extends ProtobufSchema<any, infer U> ? U : never
 type InferInterfaceType<T> = T extends ProtobufSchema<infer U, any> ? U : never
 
+/**
+ * This class is supposed to be used locally on user's machine.
+ * It accepts your messenger's schema and optional padding block size for additional layer of security.
+ */
 class ByomClient<T extends ProtobufSchema> {
 	private schema: T
 	private padding: number = 0
@@ -35,6 +39,11 @@ class ByomClient<T extends ProtobufSchema> {
 		this.padding = options.padding || 0
 	}
 
+	/**
+	 * Generates two cryptographically-secure random seeds that are used to generate two keypairs (32 bytes for signing keys keypair and 64 bytes for kem keypairs) and signs KEM public key with a sign private key.
+	 * You should announce `id` to recipient, upload `lockKey` to server with `lockSignature` to confirm lockKey belongs to you for your recipients and secretly store signKey and unlockKey to sign requests to storage server and decrypt incoming messages.
+	 * @returns An object containing `id`, `lockKey`, `lockSignature`, and a `secret` object with `signKey` and `unlockKey`.
+	 */
 	static createInbox(): {
 		id: Uint8Array
 		lockKey: Uint8Array
@@ -54,6 +63,15 @@ class ByomClient<T extends ProtobufSchema> {
 		}
 	}
 
+	/**
+	 * Verifies that the server's returned `lockKey` actually belongs to whoever owns the `id` using the `signature`.
+	 * Call it before encrypting any messages with `lockKey` to prevent impersonation attack.
+	 * @param recipient An object containing `id`, `signature`, and `lockKey`.
+	 * @param recipient.id The public key of the recipient.
+	 * @param recipient.signature The signature of the `lockKey` signed by the recipient's private key.
+	 * @param recipient.lockKey The public key of the recipient's KEM keypair.
+	 * @returns `true` if the recipient is verified, `false` otherwise.
+	 */
 	static verifyRecipient(recipient: {
 		id: Uint8Array
 		signature: Uint8Array
@@ -62,6 +80,13 @@ class ByomClient<T extends ProtobufSchema> {
 		return ml_dsa87.verify(recipient.id, recipient.lockKey, recipient.signature)
 	}
 
+	/**
+	 * Creates a digital signature that confirms you are the one who owns the `lockKey` and want to request messages for it.
+	 * @param signKey The secret key used to sign the request.
+	 * @param lockKey The public key of the KEM keypair that you want to request messages for.
+	 * @param request The Request enum value.
+	 * @returns A digital signature that can be used to verify the request. You can then pass it in any format you want, like part of formdata body, hex in headers, base64, z85 etc.
+	 */
 	static signRequest({
 		signKey,
 		lockKey,
@@ -74,6 +99,13 @@ class ByomClient<T extends ProtobufSchema> {
 		return ml_dsa87.sign(signKey, concatBytes(lockKey, new TextEncoder().encode(request)))
 	}
 
+	/**
+	 * Encrypts a message to recipient. You should pass recipient's lockKey (previously verified with `verifyRecipient` function) and the message schema params.
+	 * @param recipient An object containing the recipient's lockKey.
+	 * @param recipient.lockKey The public key of the recipient's KEM keypair.
+	 * @param message The message to encrypt, which should match the schema of the client.
+	 * @returns An encrypted blob that should be uploaded to the storage server.
+	 */
 	encryptMessage({
 		recipient,
 		message
@@ -95,6 +127,12 @@ class ByomClient<T extends ProtobufSchema> {
 		return blob
 	}
 
+	/**
+	 * This method decrypts a message using your secret unlockKey and decodes it into the protobuf schema class.
+	 * @param unlockKey The secret key used to decrypt the message.
+	 * @param blob The encrypted message blob that was previously uploaded to the storage server.
+	 * @returns The decoded message that matches the schema of the client.
+	 */
 	decryptMessage({ unlockKey, blob }: { unlockKey: Uint8Array; blob: Uint8Array }): Uint8Array {
 		const salt = blob.slice(0, SALT_LENGTH)
 		const nonce = blob.slice(SALT_LENGTH, SALT_LENGTH + NONCE_LENGTH)

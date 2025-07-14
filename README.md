@@ -1,5 +1,10 @@
 # byom — Build Your Own Messenger
 
+![GitHub License](https://img.shields.io/github/license/VityaSchel/byom)
+![JSR Version](https://img.shields.io/jsr/v/%40hloth/byom)
+![NPM Version](https://img.shields.io/npm/v/byom)
+![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/byom)
+
 I'm tired of e2ee messengers complicating stuff and ruining everything so I present to you: a set of ready components for you to build your own post-quantum self-hosted end-to-end encrypted messenger. It contains basic logic that every messenger such as Session, Signal, Matrix, Simplex has under the hood. UI, UX, networking, file I/O, frontend, backend, auth flow, data flow, features, attachments is entirely up to you.
 
 ## What is this?
