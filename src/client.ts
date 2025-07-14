@@ -35,7 +35,12 @@ class ByomClient<T extends ProtobufSchema> {
 		this.padding = options.padding || 0
 	}
 
-	static createInbox() {
+	static createInbox(): {
+		id: Uint8Array
+		lockKey: Uint8Array
+		lockSignature: Uint8Array
+		secret: { signKey: Uint8Array; unlockKey: Uint8Array }
+	} {
 		const sigKeys = ml_dsa87.keygen(randomBytes(32))
 		const kemKeys = ml_kem1024.keygen(randomBytes(64))
 		return {
@@ -75,7 +80,7 @@ class ByomClient<T extends ProtobufSchema> {
 	}: {
 		recipient: { lockKey: Uint8Array }
 		message: InferInterfaceType<T>
-	}) {
+	}): Uint8Array {
 		const encapsulated = ml_kem1024.encapsulate(recipient.lockKey)
 		const cipherText = pad(addVarint(encapsulated.cipherText), this.padding)
 		const salt = randomBytes(SALT_LENGTH)
@@ -90,7 +95,7 @@ class ByomClient<T extends ProtobufSchema> {
 		return blob
 	}
 
-	decryptMessage({ unlockKey, blob }: { unlockKey: Uint8Array; blob: Uint8Array }) {
+	decryptMessage({ unlockKey, blob }: { unlockKey: Uint8Array; blob: Uint8Array }): Uint8Array {
 		const salt = blob.slice(0, SALT_LENGTH)
 		const nonce = blob.slice(SALT_LENGTH, SALT_LENGTH + NONCE_LENGTH)
 		const { data: cipherText, remaining: msgWithPadding } = removeVarint(

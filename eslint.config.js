@@ -13,7 +13,10 @@ export default defineConfig([
 	{
 		files: ['**/*.{js,mjs,cjs,ts}'],
 		plugins: { js },
-		extends: ['js/recommended']
+		extends: ['js/recommended'],
+		rules: {
+			'@typescript-eslint/explicit-function-return-type': 'error'
+		}
 	},
 	tseslint.configs.recommended,
 	eslintConfigPrettier
