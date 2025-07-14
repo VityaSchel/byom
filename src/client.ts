@@ -1,17 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ml_kem1024 } from '@noble/post-quantum/ml-kem'
-// import { ml_dsa87 } from '@noble/post-quantum/ml-dsa'
 import { randomBytes, concatBytes } from '@noble/post-quantum/utils'
-import { decode, encode } from './base85'
-import { addVarint, removeVarint, pad, depad } from './padding'
 import { hkdf } from '@noble/hashes/hkdf'
 import { sha512 } from '@noble/hashes/sha2'
 import { gcm } from '@noble/ciphers/aes'
-
-const SALT_LENGTH = 32
-const NONCE_LENGTH = 12
-const HKDF_INFO = new TextEncoder().encode('byom-msg-cipher-v1')
-const HKDF_KEY_LENGTH = 32 // 256 bits
+import { ml_dsa87 } from '@noble/post-quantum/ml-dsa'
+import { addVarint, removeVarint, pad, depad } from './padding'
+import { HKDF_INFO, HKDF_KEY_LENGTH, NONCE_LENGTH, SALT_LENGTH, Request } from './consts'
 
 type ProtobufSchema<TInterface = any, TMessage = any> = {
 	create(properties?: TInterface): TMessage
@@ -40,28 +35,48 @@ class ByomClient<T extends ProtobufSchema> {
 		this.padding = options.padding || 0
 	}
 
-	private static getKeys() {
-		const seed = randomBytes(64)
-		const keys = ml_kem1024.keygen(seed)
-		return keys
-	}
-
 	static createInbox() {
-		const keys = ByomClient.getKeys()
+		const sigKeys = ml_dsa87.keygen(randomBytes(32))
+		const kemKeys = ml_kem1024.keygen(randomBytes(64))
 		return {
-			id: encode(keys.publicKey),
-			key: keys.secretKey
+			id: sigKeys.publicKey,
+			lockKey: kemKeys.publicKey,
+			lockSignature: ml_dsa87.sign(sigKeys.secretKey, kemKeys.publicKey),
+			secret: {
+				signKey: sigKeys.secretKey,
+				unlockKey: kemKeys.secretKey
+			}
 		}
 	}
 
-	static getRecipient(id: string): Uint8Array {
-		const recipientKey = decode(id)
-		return recipientKey
+	static verifyRecipient(recipient: {
+		id: Uint8Array
+		signature: Uint8Array
+		lockKey: Uint8Array
+	}): boolean {
+		return ml_dsa87.verify(recipient.id, recipient.lockKey, recipient.signature)
 	}
 
-	encryptMessage({ recipient, message }: { recipient: string; message: InferInterfaceType<T> }) {
-		const recipientPk = decode(recipient)
-		const encapsulated = ml_kem1024.encapsulate(recipientPk)
+	static signRequest({
+		signKey,
+		lockKey,
+		request
+	}: {
+		signKey: Uint8Array
+		lockKey: Uint8Array
+		request: Request
+	}): Uint8Array {
+		return ml_dsa87.sign(signKey, concatBytes(lockKey, new TextEncoder().encode(request)))
+	}
+
+	encryptMessage({
+		recipient,
+		message
+	}: {
+		recipient: { lockKey: Uint8Array }
+		message: InferInterfaceType<T>
+	}) {
+		const encapsulated = ml_kem1024.encapsulate(recipient.lockKey)
 		const cipherText = pad(addVarint(encapsulated.cipherText), this.padding)
 		const salt = randomBytes(SALT_LENGTH)
 

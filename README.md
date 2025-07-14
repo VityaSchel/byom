@@ -35,6 +35,8 @@ Install package:
 bun add byom
 ```
 
+See [example/index.ts]
+
 ## Credit
 
 - Thanks to [li0ard](https://github.com/li0ard) for npm signed package publishing workflow ([donate](https://li0ard.rest/donate))
