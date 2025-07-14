@@ -35,7 +35,7 @@ Install package:
 bun add byom
 ```
 
-See [example/index.ts]
+See [example/index.ts](https://github.com/VityaSchel/byom/blob/main/example/index.ts)
 
 ## Credit
 
