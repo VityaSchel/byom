@@ -1,12 +1,12 @@
-import { Byom } from '../src'
+import { ByomClient } from '../src/client'
 import { foobar } from './proto'
 
-const app = new Byom({
+const app = new ByomClient({
 	schema: foobar.Message,
 	padding: 128
 })
 
-const { id, key } = Byom.createInbox()
+const { id, key } = ByomClient.createInbox()
 const blob = app.encryptMessage({
 	recipient: id,
 	message: {
