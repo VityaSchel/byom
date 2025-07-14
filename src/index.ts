@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ml_kem1024 } from '@noble/post-quantum/ml-kem'
-import { ml_dsa87 } from '@noble/post-quantum/ml-dsa'
+// import { ml_dsa87 } from '@noble/post-quantum/ml-dsa'
 import { randomBytes, concatBytes } from '@noble/post-quantum/utils'
 import { decode, encode } from './base85'
-import { pad } from './padding'
+import { addVarint, removeVarint, pad, depad } from './padding'
 import { hkdf } from '@noble/hashes/hkdf'
 import { sha512 } from '@noble/hashes/sha2'
 import { gcm } from '@noble/ciphers/aes'
@@ -12,15 +13,16 @@ const NONCE_LENGTH = 12
 const HKDF_INFO = new TextEncoder().encode('byom-msg-cipher-v1')
 const HKDF_KEY_LENGTH = 32 // 256 bits
 
-type ProtobufMessage = {
-	encode<T extends import('protobufjs').Message<T>>(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		message: T | { [k: string]: any },
-		writer?: import('protobufjs').Writer
-	): import('protobufjs').Writer
+type ProtobufSchema<TInterface = any, TMessage = any> = {
+	create(properties?: TInterface): TMessage
+	encode(message: TInterface, writer?: any): any
+	decode(reader: any): TMessage
 }
 
-class Byom<T extends ProtobufMessage> {
+type InferMessageType<T> = T extends ProtobufSchema<any, infer U> ? U : never
+type InferInterfaceType<T> = T extends ProtobufSchema<infer U, any> ? U : never
+
+class Byom<T extends ProtobufSchema> {
 	private schema: T
 	private padding: number = 0
 
@@ -57,23 +59,17 @@ class Byom<T extends ProtobufMessage> {
 		return recipientKey
 	}
 
-	encryptMessage({
-		recipientId,
-		message
-	}: {
-		recipientId: string
-		message: Parameters<T['encode']>[0]
-	}) {
-		const recipientPk = decode(recipientId)
+	encryptMessage({ recipient, message }: { recipient: string; message: InferInterfaceType<T> }) {
+		const recipientPk = decode(recipient)
 		const encapsulated = ml_kem1024.encapsulate(recipientPk)
-		const cipherText = pad(encapsulated.cipherText, this.padding)
+		const cipherText = pad(addVarint(encapsulated.cipherText), this.padding)
 		const salt = randomBytes(SALT_LENGTH)
 
 		const key = hkdf(sha512, encapsulated.sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
 
 		const nonce = randomBytes(NONCE_LENGTH)
 		const buf = this.schema.encode(message).finish()
-		const msg = pad(gcm(key, nonce).encrypt(buf), this.padding)
+		const msg = pad(addVarint(gcm(key, nonce).encrypt(buf)), this.padding)
 
 		const blob = concatBytes(salt, nonce, cipherText, msg)
 		return blob
@@ -82,8 +78,14 @@ class Byom<T extends ProtobufMessage> {
 	decryptMessage({ key, blob }: { key: Uint8Array; blob: Uint8Array }) {
 		const salt = blob.slice(0, SALT_LENGTH)
 		const nonce = blob.slice(SALT_LENGTH, SALT_LENGTH + NONCE_LENGTH)
-    const cipherTextAndMsg = blob.slice(SALT_LENGTH + NONCE_LENGTH)
-    
+		const { data: cipherText, remaining: msgWithPadding } = removeVarint(
+			blob.slice(SALT_LENGTH + NONCE_LENGTH)
+		)
+		const { data: msg } = removeVarint(depad(msgWithPadding))
+		const sharedSecret = ml_kem1024.decapsulate(cipherText, key)
+		const derivedKey = hkdf(sha512, sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
+		const decrypted = gcm(derivedKey, nonce).decrypt(msg)
+		return this.schema.decode(decrypted) as InferMessageType<T>
 	}
 }
 

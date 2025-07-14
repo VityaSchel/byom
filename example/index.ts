@@ -1,16 +1,25 @@
 import { Byom } from '../src'
 import { foobar } from './proto'
 
-const app = new Byom({ schema: foobar.Message, padding: 128 })
+const app = new Byom({
+	schema: foobar.Message,
+	padding: 128
+})
 
 const { id, key } = Byom.createInbox()
+const blob = app.encryptMessage({
+	recipient: id,
+	message: {
+		from: 'Alice',
+		text: '1234',
+		timestamp: Date.now()
+	}
+})
 console.log(
-	app.encryptMessage({
-		recipientKey: Byom.getRecipient(id),
-		message: {
-			from: 'Alice',
-			text: '1234',
-			timestamp: Date.now()
-		}
-	})
+	app
+		.decryptMessage({
+			key,
+			blob
+		})
+		.toJSON()
 )
