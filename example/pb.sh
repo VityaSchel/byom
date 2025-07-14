@@ -1,0 +1,1 @@
+../node_modules/.bin/pbjs -t static-module -w es6 -o proto.js foobar.proto && ../node_modules/.bin/pbts -o proto.d.ts proto.js
