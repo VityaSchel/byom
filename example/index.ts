@@ -112,7 +112,7 @@ if (!isSignatureValid) {
 }
 
 // 11. Alice uses her secret unlock key to decrypt the messages
-const decryptedMessage = byomClient.decryptMessage({ key: aliceInbox.secret.unlockKey, blob })
+const decryptedMessage = byomClient.decryptMessage({ unlockKey: aliceInbox.secret.unlockKey, blob })
 
 // 12. We have successfully transmitted an encrypted message in post-quantum way!
 console.log(

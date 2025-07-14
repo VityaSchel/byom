@@ -6,7 +6,7 @@ import { sha512 } from '@noble/hashes/sha2'
 import { gcm } from '@noble/ciphers/aes'
 import { ml_dsa87 } from '@noble/post-quantum/ml-dsa'
 import { addVarint, removeVarint, pad, depad } from './padding'
-import { HKDF_INFO, HKDF_KEY_LENGTH, NONCE_LENGTH, SALT_LENGTH, Request } from './consts'
+import { HKDF_INFO, HKDF_KEY_LENGTH, NONCE_LENGTH, SALT_LENGTH, type Request } from './consts'
 
 type ProtobufSchema<TInterface = any, TMessage = any> = {
 	create(properties?: TInterface): TMessage
@@ -90,14 +90,14 @@ class ByomClient<T extends ProtobufSchema> {
 		return blob
 	}
 
-	decryptMessage({ key, blob }: { key: Uint8Array; blob: Uint8Array }) {
+	decryptMessage({ unlockKey, blob }: { unlockKey: Uint8Array; blob: Uint8Array }) {
 		const salt = blob.slice(0, SALT_LENGTH)
 		const nonce = blob.slice(SALT_LENGTH, SALT_LENGTH + NONCE_LENGTH)
 		const { data: cipherText, remaining: msgWithPadding } = removeVarint(
 			blob.slice(SALT_LENGTH + NONCE_LENGTH)
 		)
 		const { data: msg } = removeVarint(depad(msgWithPadding))
-		const sharedSecret = ml_kem1024.decapsulate(cipherText, key)
+		const sharedSecret = ml_kem1024.decapsulate(cipherText, unlockKey)
 		const derivedKey = hkdf(sha512, sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
 		const decrypted = gcm(derivedKey, nonce).decrypt(msg)
 		return this.schema.decode(decrypted) as InferMessageType<T>

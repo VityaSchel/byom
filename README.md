@@ -35,11 +35,17 @@ Install package:
 bun add byom
 ```
 
-See [example/index.ts](https://github.com/VityaSchel/byom/blob/main/example/index.ts)
+See [example/index.ts](https://github.com/VityaSchel/byom/blob/main/example/index.ts) for an easy-to-follow step-by-step demo of how this thing works
 
-## Credit
+See [DOCS.md](https://github.com/VityaSchel/byom/blob/main/DOCS.md) for full API reference.
 
-- Thanks to [li0ard](https://github.com/li0ard) for npm signed package publishing workflow ([donate](https://li0ard.rest/donate))
+## TODO
+
+- Add nonce to requests verification to prevent MITM from intercepting requests and mitigate replay attacks
+
+## Credits
+
+- Thanks to [li0ard](https://github.com/li0ard) for npm signed package publishing and jsr publishing workflow ([donate](https://li0ard.rest/donate))
 - Thanks to [Paul Miller](https://github.com/paulmillr) for @noble package ([donate](https://github.com/sponsors/paulmillr/))
 
 ## License
