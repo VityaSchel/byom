@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "skipLibCheck": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
+    "allowImportingTsExtensions": true,
+    "noImplicitOverride": true,
+    "noEmit": true
+  }
+}
