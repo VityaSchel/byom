@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { ByomClient } from '../src/client'
-import { Request } from '../src/consts'
-import { ByomServer } from '../src/server'
+import { ByomClient } from '../../src/client'
+import { Request } from '../../src/consts'
+import { ByomServer } from '../../src/server'
 import { foobar } from './proto'
 
-const fetch = (..._: unknown[]) => {} // Mock fetch for example purposes
+const fetch = (..._: unknown[]): void => {} // Mock fetch for example purposes
 
 // Client handles all encryption and encoding stuff
 const byomClient = new ByomClient({

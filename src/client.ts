@@ -42,25 +42,147 @@ class ByomClient<T extends ProtobufSchema> {
 	/**
 	 * Generates two cryptographically-secure random seeds that are used to generate two keypairs (32 bytes for signing keys keypair and 64 bytes for kem keypairs) and signs KEM public key with a sign private key.
 	 * You should announce `id` to recipient, upload `lockKey` to server with `lockSignature` to confirm lockKey belongs to you for your recipients and secretly store signKey and unlockKey to sign requests to storage server and decrypt incoming messages.
-	 * @returns An object containing `id`, `lockKey`, `lockSignature`, and a `secret` object with `signKey` and `unlockKey`.
+	 * @returns An object containing `id`, `lockKey`, `lockSignature`, and a `secret` object with `signKey`, `unlockKey` and `seed`.
 	 */
-	static createInbox(): {
+	static createInbox(): ReturnType<typeof ByomClient.restoreInbox> {
+		const sigSeed = randomBytes(32)
+		const kemSeed = randomBytes(64)
+		const seed = concatBytes(sigSeed, kemSeed)
+		return ByomClient.restoreInbox({
+			seed
+		})
+	}
+
+	/**
+	 * Reconstructs all inbox keys from the master seed.
+	 * You can use this method to connect a new device.
+	 * @returns An object containing `id`, `lockKey`, `lockSignature`, and a `secret` object with `signKey`, `unlockKey` and `seed`.
+	 */
+	static restoreInbox({ seed }: { seed: Uint8Array }): {
 		id: Uint8Array
 		lockKey: Uint8Array
 		lockSignature: Uint8Array
-		secret: { signKey: Uint8Array; unlockKey: Uint8Array }
+		/** You should never transfer any of these values over network. Consult ByomClient.secureReceiveSeedInit() function */
+		secret: {
+			/** You should never transfer signKey over network. Consult ByomClient.secureReceiveSeedInit() function */
+			signKey: Uint8Array
+			/** You should never transfer unlockKey over network. Consult ByomClient.secureReceiveSeedInit() function */
+			unlockKey: Uint8Array
+			/** You should never transfer seed over network. Consult ByomClient.secureReceiveSeedInit() function */
+			seed: Uint8Array
+		}
 	} {
-		const sigKeys = ml_dsa87.keygen(randomBytes(32))
-		const kemKeys = ml_kem1024.keygen(randomBytes(64))
+		if (seed.length !== 96) {
+			throw new Error(
+				'Seed must be 96 bytes long (32 bytes for signing keys and 64 bytes for KEM keys)'
+			)
+		}
+		const sigSeed = seed.slice(0, 32)
+		const kemSeed = seed.slice(32, 32 + 64)
+		const sigKeys = ml_dsa87.keygen(sigSeed)
+		const kemKeys = ml_kem1024.keygen(kemSeed)
 		return {
 			id: sigKeys.publicKey,
 			lockKey: kemKeys.publicKey,
 			lockSignature: ml_dsa87.sign(sigKeys.secretKey, kemKeys.publicKey),
 			secret: {
 				signKey: sigKeys.secretKey,
-				unlockKey: kemKeys.secretKey
+				unlockKey: kemKeys.secretKey,
+				seed
 			}
 		}
+	}
+
+	/**
+	 * (1/3) Generates a pair of keys for secure seed transfer channel.
+	 *
+	 * In order to securely transmit all keys for your inbox from one device to another,
+	 * you need to:
+	 * 1. Call **ByomClient.secureReceiveSeedInit()** on the receiving device to generate a pair of keys used to create a secure transfer channel.
+	 * 2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel.
+	 * 3. Call ByomClient.secureReceiveSeedFinalize() on the receiving device to decrypt the seed using the secure transfer channel keys.
+	 *
+	 * @returns An object containing `seedTransferPubKey` (send it to the sending device) and `seedTransferSecret` (only use it locally with ByomClient.secureReceiveSeedFinalize function).
+	 */
+	static secureReceiveSeedInit(): {
+		seedTransferPubKey: Uint8Array<ArrayBufferLike>
+		/** You should never transfer seedTransferSecret over network. It must be used locally with ByomClient.secureReceiveSeedFinalize function. */
+		seedTransferSecret: Uint8Array<ArrayBufferLike>
+	} {
+		const seedTransferKeys = ml_kem1024.keygen(randomBytes(64))
+		return {
+			seedTransferPubKey: seedTransferKeys.publicKey,
+			seedTransferSecret: seedTransferKeys.secretKey
+		}
+	}
+
+	/**
+	 * (2/3) Encrypts the seed for secure transfer channel.
+	 *
+	 * In order to securely transmit all keys for your inbox from one device to another,
+	 * you need to:
+	 * 1. Call ByomClient.secureReceiveSeedInit() on the receiving device to generate a pair of keys used to create a secure transfer channel.
+	 * 2. Call **ByomClient.secureSendSeed()** on the sending device to encrypt the seed for the secure transfer channel.
+	 * 3. Call ByomClient.secureReceiveSeedFinalize() on the receiving device to decrypt the seed using the secure transfer channel keys.
+	 *
+	 * @returns An encrypted blob that should be sent to the receiving device.
+	 */
+	static secureSendSeed({
+		seed,
+		receiverSeedTransferPubKey
+	}: {
+		seed: Uint8Array
+		receiverSeedTransferPubKey: Uint8Array
+	}): Uint8Array {
+		if (seed.length !== 96) {
+			throw new Error(
+				'Seed must be 96 bytes long (32 bytes for signing keys and 64 bytes for KEM keys)'
+			)
+		}
+		const { cipherText: seedEncryptionKeyEncrypted, sharedSecret: seedEncryptionKey } =
+			ml_kem1024.encapsulate(receiverSeedTransferPubKey)
+		const seedEncryptionNonce = randomBytes(NONCE_LENGTH)
+		const seedEncrypted = gcm(seedEncryptionKey, seedEncryptionNonce).encrypt(seed)
+		const seedTransferBlob = concatBytes(
+			seedEncryptionNonce,
+			addVarint(seedEncryptionKeyEncrypted),
+			seedEncrypted
+		)
+		return seedTransferBlob
+	}
+
+	/**
+	 * (2/3) Decrypts the seed using secure transfer channel's key, generated in first step.
+	 *
+	 * In order to securely transmit all keys for your inbox from one device to another,
+	 * you need to:
+	 * 1. Call ByomClient.secureReceiveSeedInit() on the receiving device to generate a pair of keys used to create a secure transfer channel.
+	 * 2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel.
+	 * 3. Call **ByomClient.secureReceiveSeedFinalize()** on the receiving device to decrypt the seed using the secure transfer channel keys.
+	 *
+	 * @returns The decrypted seed you can use with the ByomClient.restoreInbox function.
+	 */
+	static secureReceiveSeedFinalize({
+		seedTransferSecret,
+		encryptedSeed
+	}: {
+		seedTransferSecret: Uint8Array
+		encryptedSeed: Uint8Array
+	}): Uint8Array {
+		const seedEncryptionNonce = encryptedSeed.slice(0, NONCE_LENGTH)
+		const { data: seedEncryptionKeyEncrypted, remaining: seedEncrypted } = removeVarint(
+			encryptedSeed.slice(NONCE_LENGTH)
+		)
+
+		const seedEncryptionKey = ml_kem1024.decapsulate(seedEncryptionKeyEncrypted, seedTransferSecret)
+		const seed = gcm(seedEncryptionKey, seedEncryptionNonce).decrypt(seedEncrypted)
+
+		if (seed.length !== 96) {
+			throw new Error(
+				'Seed must be 96 bytes long (32 bytes for signing keys and 64 bytes for KEM keys)'
+			)
+		}
+		return seed
 	}
 
 	/**
@@ -133,7 +255,13 @@ class ByomClient<T extends ProtobufSchema> {
 	 * @param blob The encrypted message blob that was previously uploaded to the storage server.
 	 * @returns The decoded message that matches the schema of the client.
 	 */
-	decryptMessage({ unlockKey, blob }: { unlockKey: Uint8Array; blob: Uint8Array }): Uint8Array {
+	decryptMessage({
+		unlockKey,
+		blob
+	}: {
+		unlockKey: Uint8Array
+		blob: Uint8Array
+	}): InferMessageType<T> {
 		const salt = blob.slice(0, SALT_LENGTH)
 		const nonce = blob.slice(SALT_LENGTH, SALT_LENGTH + NONCE_LENGTH)
 		const { data: cipherText, remaining: msgWithPadding } = removeVarint(
@@ -143,7 +271,7 @@ class ByomClient<T extends ProtobufSchema> {
 		const sharedSecret = ml_kem1024.decapsulate(cipherText, unlockKey)
 		const derivedKey = hkdf(sha512, sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
 		const decrypted = gcm(derivedKey, nonce).decrypt(msg)
-		return this.schema.decode(decrypted) as InferMessageType<T>
+		return this.schema.decode(decrypted)
 	}
 }
 

@@ -40,7 +40,7 @@ Install package:
 bun add byom
 ```
 
-See [example/index.ts](https://github.com/VityaSchel/byom/blob/main/example/index.ts) for an easy-to-follow step-by-step demo of how this thing works
+See [example/README.md](https://github.com/VityaSchel/byom/blob/main/example/README.md) for easy-to-follow step-by-step demos of how this thing works
 
 See [DOCS.md](https://github.com/VityaSchel/byom/blob/main/DOCS.md) for full API reference.
 
