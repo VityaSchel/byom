@@ -10,12 +10,20 @@ console.log('[Local] Sending seed:', _s(device1_inbox.secret.seed))
 
 // === Device 2 ===
 const device2_transfer_channel = ByomClient.secureReceiveSeedInit()
-// Send `device2_transfer_channel.seedTransferPubKey` to Device 1
 console.log('[Attacker sees]', _s(device2_transfer_channel.seedTransferPubKey))
+console.log('Fingerprint:', device2_transfer_channel.fingerprint)
+const transfer_channel_key = device2_transfer_channel.seedTransferPubKey
+// Send `device2_transfer_channel.seedTransferPubKey` to Device 1
 
-console.log(device2_transfer_channel.seedTransferPubKey.length)
+// An attacker might intercept the `transfer_channel_key` and change it to their own key.
+// That is why we present emoji-based fingerprints to user and ask to compare them.
 
 // === Device 1 ===
+const transfer_channel_key_fingerprint = ByomClient.fingerprint(transfer_channel_key, 8)
+console.log('Fingerprint:', transfer_channel_key_fingerprint)
+if (device2_transfer_channel.fingerprint !== transfer_channel_key_fingerprint) {
+	throw new Error('Transfer channel key fingerprint does not match! Possible MITM attack!')
+}
 const encryptedSeed = ByomClient.secureSendSeed({
 	seed: device1_inbox.secret.seed,
 	receiverSeedTransferPubKey: device2_transfer_channel.seedTransferPubKey

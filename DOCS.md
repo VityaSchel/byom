@@ -110,16 +110,22 @@ In order to securely transmit all keys for your inbox from one device to another
 you need to:
 
 1. Call ByomClient.secureReceiveSeedInit() on the receiving device to generate a pair of keys used to create a secure transfer channel.
-2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel.
+2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel. Always verify that fingerprint of the pub key matches the one generated in first step.
 3. Call ByomClient.secureReceiveSeedFinalize() on the receiving device to decrypt the seed using the secure transfer channel keys.
 
 This function generates a pair of keys for secure seed transfer channel.
 
 It returns an object containing `seedTransferPubKey` (send it to the sending device) and `seedTransferSecret` (only use it locally with ByomClient.secureReceiveSeedFinalize function).
 
+Present `fingerprint` to user and follow the next step.
+
 ### `static secureSendSeed(args: { seed: Uint8Array; receiverSeedTransferPubKey: Uint8Array }): Uint8Array`
 
 Encrypts the seed for secure transfer channel.
+
+Never trust receiverSeedTransferPubKey without verifying its fingerprint with ByomClient.fingerprint. An attacker can replace it with their own key and intercept the seed pretending to be another device.
+
+Present the result of `ByomClient.fingerprint(receiverSeedTransferPubKey)` to user and ask them to compare both fingerprints manuallu.
 
 ### `static secureReceiveSeedFinalize(args: { seedTransferSecret: Uint8Array; encryptedSeed: Uint8Array }): Uint8Array`
 

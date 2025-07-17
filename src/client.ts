@@ -2,11 +2,12 @@
 import { ml_kem1024 } from '@noble/post-quantum/ml-kem'
 import { randomBytes, concatBytes } from '@noble/post-quantum/utils'
 import { hkdf } from '@noble/hashes/hkdf'
-import { sha512 } from '@noble/hashes/sha2'
 import { gcm } from '@noble/ciphers/aes'
 import { ml_dsa87 } from '@noble/post-quantum/ml-dsa'
 import { addVarint, removeVarint, pad, depad } from './padding'
 import { HKDF_INFO, HKDF_KEY_LENGTH, NONCE_LENGTH, SALT_LENGTH, type Request } from './consts'
+import { sha3_256, sha3_512 } from '@noble/hashes/sha3'
+import { EMOJI_LIST, get6BitChunks } from './fingerprint'
 
 type ProtobufSchema<TInterface = any, TMessage = any> = {
 	create(properties?: TInterface): TMessage
@@ -99,7 +100,7 @@ class ByomClient<T extends ProtobufSchema> {
 	 * In order to securely transmit all keys for your inbox from one device to another,
 	 * you need to:
 	 * 1. Call **ByomClient.secureReceiveSeedInit()** on the receiving device to generate a pair of keys used to create a secure transfer channel.
-	 * 2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel.
+	 * 2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel. Always verify that fingerprint of the pub key matches the one generated in first step.
 	 * 3. Call ByomClient.secureReceiveSeedFinalize() on the receiving device to decrypt the seed using the secure transfer channel keys.
 	 *
 	 * @returns An object containing `seedTransferPubKey` (send it to the sending device) and `seedTransferSecret` (only use it locally with ByomClient.secureReceiveSeedFinalize function).
@@ -108,21 +109,32 @@ class ByomClient<T extends ProtobufSchema> {
 		seedTransferPubKey: Uint8Array<ArrayBufferLike>
 		/** You should never transfer seedTransferSecret over network. It must be used locally with ByomClient.secureReceiveSeedFinalize function. */
 		seedTransferSecret: Uint8Array<ArrayBufferLike>
+		fingerprint: string
 	} {
 		const seedTransferKeys = ml_kem1024.keygen(randomBytes(64))
 		return {
 			seedTransferPubKey: seedTransferKeys.publicKey,
-			seedTransferSecret: seedTransferKeys.secretKey
+			seedTransferSecret: seedTransferKeys.secretKey,
+			fingerprint: ByomClient.fingerprint(seedTransferKeys.publicKey, 8)
 		}
+	}
+
+	static fingerprint(key: Uint8Array, length = 8): string {
+		const hash = sha3_256(key)
+		const chunks = get6BitChunks(hash, length)
+		return chunks.map((i) => EMOJI_LIST[i]).join('')
 	}
 
 	/**
 	 * (2/3) Encrypts the seed for secure transfer channel.
 	 *
+	 * Never trust receiverSeedTransferPubKey without verifying its fingerprint with ByomClient.fingerprint.
+	 * An attacker can replace it with their own key and intercept the seed pretending to be another device.
+	 *
 	 * In order to securely transmit all keys for your inbox from one device to another,
 	 * you need to:
 	 * 1. Call ByomClient.secureReceiveSeedInit() on the receiving device to generate a pair of keys used to create a secure transfer channel.
-	 * 2. Call **ByomClient.secureSendSeed()** on the sending device to encrypt the seed for the secure transfer channel.
+	 * 2. Call **ByomClient.secureSendSeed()** on the sending device to encrypt the seed for the secure transfer channel. Always verify that fingerprint of the pub key matches the one generated in first step.
 	 * 3. Call ByomClient.secureReceiveSeedFinalize() on the receiving device to decrypt the seed using the secure transfer channel keys.
 	 *
 	 * @returns An encrypted blob that should be sent to the receiving device.
@@ -157,7 +169,7 @@ class ByomClient<T extends ProtobufSchema> {
 	 * In order to securely transmit all keys for your inbox from one device to another,
 	 * you need to:
 	 * 1. Call ByomClient.secureReceiveSeedInit() on the receiving device to generate a pair of keys used to create a secure transfer channel.
-	 * 2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel.
+	 * 2. Call ByomClient.secureSendSeed() on the sending device to encrypt the seed for the secure transfer channel. Always verify that fingerprint of the pub key matches the one generated in first step.
 	 * 3. Call **ByomClient.secureReceiveSeedFinalize()** on the receiving device to decrypt the seed using the secure transfer channel keys.
 	 *
 	 * @returns The decrypted seed you can use with the ByomClient.restoreInbox function.
@@ -239,7 +251,7 @@ class ByomClient<T extends ProtobufSchema> {
 		const cipherText = pad(addVarint(encapsulated.cipherText), this.padding)
 		const salt = randomBytes(SALT_LENGTH)
 
-		const key = hkdf(sha512, encapsulated.sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
+		const key = hkdf(sha3_512, encapsulated.sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
 
 		const nonce = randomBytes(NONCE_LENGTH)
 		const buf = this.schema.encode(message).finish()
@@ -269,7 +281,7 @@ class ByomClient<T extends ProtobufSchema> {
 		)
 		const { data: msg } = removeVarint(depad(msgWithPadding))
 		const sharedSecret = ml_kem1024.decapsulate(cipherText, unlockKey)
-		const derivedKey = hkdf(sha512, sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
+		const derivedKey = hkdf(sha3_512, sharedSecret, salt, HKDF_INFO, HKDF_KEY_LENGTH)
 		const decrypted = gcm(derivedKey, nonce).decrypt(msg)
 		return this.schema.decode(decrypted)
 	}
