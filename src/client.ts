@@ -23,7 +23,13 @@ type InferInterfaceType<T> = T extends ProtobufSchema<infer U, any> ? U : never
  * It accepts your messenger's schema and optional padding block size for additional layer of security.
  */
 class ByomClient<T extends ProtobufSchema> {
+	/**
+	 * Protobuf schema to encode messages.
+	 */
 	private schema: T
+	/**
+	 * Optional padding block size for the encoded messages in bytes.
+	 */
 	private padding: number = 0
 
 	constructor(options: {
@@ -119,6 +125,13 @@ class ByomClient<T extends ProtobufSchema> {
 		}
 	}
 
+	/**
+	 * Creates an emoji fingerprint of the given key.
+	 * This is used to verify that the key you received from the other device is actually the one you expect.
+	 * @param key The key to create a fingerprint for.
+	 * @param length The length of the fingerprint in emojis. Default is 8.
+	 * @returns An emoji fingerprint of the key.
+	 */
 	static fingerprint(key: Uint8Array, length = 8): string {
 		const hash = sha3_256(key)
 		const chunks = get6BitChunks(hash, length)
