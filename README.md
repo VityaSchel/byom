@@ -1,6 +1,6 @@
 # byom — Build Your Own Messenger
 
-[![GitHub License](https://img.shields.io/github/license/VityaSchel/byom)](https://github.com/VityaSchel/byom/blob/main/LICENSE)
+[![GitHub License](https://img.shields.io/github/license/VityaSchel/byom)](https://git.hloth.dev/hloth/byom/src/branch/main/LICENSE)
 [![JSR Version](https://img.shields.io/jsr/v/%40hloth/byom)](https://jsr.io/@hloth/byom)
 [![NPM Version](https://img.shields.io/npm/v/byom)](https://www.npmjs.com/package/byom)
 [![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/byom)](https://www.npmjs.com/package/byom)
@@ -40,9 +40,9 @@ Install package:
 bun add byom
 ```
 
-See [example/README.md](https://github.com/VityaSchel/byom/blob/main/example/README.md) for easy-to-follow step-by-step demos of how this thing works
+See [example/README.md](https://git.hloth.dev/hloth/byom/src/branch/main/example/README.md) for easy-to-follow step-by-step demos of how this thing works
 
-See [DOCS.md](https://github.com/VityaSchel/byom/blob/main/DOCS.md) for full API reference.
+See [DOCS.md](https://git.hloth.dev/hloth/byom/src/branch/main/DOCS.md) for full API reference.
 
 ## TODO
 

@@ -1,6 +1,6 @@
 {
   "name": "byom",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "type": "module",
   "author": "Viktor Shchelochkov <hi@hloth.dev> (https://hloth.dev)",
   "description": "Build Your Own post-quantum self-hosted end-to-end encrypted Messenger",
@@ -16,12 +16,12 @@
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VityaSchel/byom.git"
+    "url": "git+https://git.hloth.dev/hloth/byom.git"
   },
   "bugs": {
-    "url": "https://github.com/VityaSchel/byom/issues"
+    "url": "https://git.hloth.dev/hloth/byom/issues"
   },
-  "homepage": "https://github.com/VityaSchel/byom#readme",
+  "homepage": "https://git.hloth.dev/hloth/byom#readme",
   "files": [
     "dist"
   ],

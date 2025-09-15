@@ -1,6 +1,6 @@
 # byom examples
 
-This directory contains examples of how you can use [byom](https://github.com/VityaSchel/byom).
+This directory contains examples of how you can use [byom](https://git.hloth.dev/hloth/byom).
 
 ## Send and receive messages
 
